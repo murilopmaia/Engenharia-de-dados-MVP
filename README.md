@@ -113,9 +113,9 @@ Grão: uma linha por jogo (`app_id`).
 |---|---|---|---|
 | `app_id` | int | identificador único da Steam | Chave do jogo (PK) |
 | `title` | string | texto livre | Nome do jogo. 2 jogos sem nome na fonte original recebem "(nome não informado)" |
-| `release_date` | date | 1997-06-29 a 2025-03-09 | Data de lançamento na Steam |
+| `release_date` | date | 1997-06-30 a 2025-03-10 | Data de lançamento na Steam |
 | `release_year` | int | 1997 a 2025 | Ano de lançamento, derivado de `release_date` |
-| `years_since_release` | double | ≥ 0 | Anos desde o lançamento até hoje, usado na pergunta 5 |
+| `years_since_release` | bigint | 0 a 27 | Anos completos entre o lançamento e a data de coleta do dataset (2025-03-10, a `release_date` mais recente), usado na pergunta 5 |
 | `required_age` | int | 0, 1, 3, 6, 7, 10, 12, 13, 14, 15, 16, 17, 18, 20, 21; nulo se inválido | Faixa etária mínima exigida. 98,9% dos jogos têm valor 0 (sem restrição) |
 | `has_age_restriction` | boolean | true/false | `required_age > 0`, usado na pergunta 7 |
 | `windows`/`mac`/`linux` | boolean | true/false | Suporte declarado a cada plataforma |
@@ -165,7 +165,7 @@ O pipeline é **ramificado**: um notebook por camada/etapa, cada um lendo a tabe
 - **Tipagem:** todas as colunas `string` convertidas para `int`/`double`/`date`/`boolean` conforme o Catálogo de Dados.
 - **Parsing de listas:** `genres`/`categories` (texto no formato de lista Python) convertidos para `array<string>`.
 - **Parsing de faixa:** `estimated_owners` (texto `"100000 - 200000"`) convertido em `estimated_owners_min`/`max`/`avg`.
-- **Métrica de aceitação com fallback:** `acceptance_ratio`/`review_count` calculados a partir de `positive`/`negative` (Steam API) quando disponível, com fallback para `pct_pos_total`/`num_reviews_total` (SteamSpy) quando a primeira fonte não tem dado — cobre 88,4% dos jogos, contra 76,5% ou 58,3% usando cada campo isoladamente (detalhes na seção de Qualidade de Dados).
+- **Métrica de aceitação com fallback:** `acceptance_ratio`/`review_count` calculados a partir de `positive`/`negative` (Steam API) quando disponível, com fallback para `pct_pos_total`/`num_reviews_total` (SteamSpy) quando a primeira fonte não tem dado — cobre 88,4% dos registros da Bronze, contra 76,5% ou 58,3% usando cada campo isoladamente (detalhes na seção de Qualidade de Dados).
 
 Todas as transformações estão documentadas, com o porquê de cada decisão, nas células markdown do notebook [`02_silver_limpeza.ipynb`](notebooks/02_silver_limpeza.ipynb).
 
@@ -201,10 +201,10 @@ O critério clássico de outlier (`Q3 + IQR`) quebra em colunas com excesso de z
 |---|---|---|---|
 | `price` | $999,98 | 8 | Softwares de nicho/empresariais vendidos como "jogo" (ex.: "Ascent Free-Roaming VR Experience") |
 | `discount` | 100% | 1 | "Isle of Jura" — temporariamente gratuito na coleta |
-| `dlc_count` | 3.427 | 95 (os 3 mais extremos: 3.427, 2.004, 1.191) | Fantasy Grounds VTT/Classic e Rocksmith 2014 — vendem centenas de complementos pequenos como "DLC" |
+| `dlc_count` | 3.427 | 89 (os 3 mais extremos: 3.427, 2.004, 1.191) | Fantasy Grounds VTT/Classic e Rocksmith 2014 — vendem centenas de complementos pequenos como "DLC" |
 | `required_age` | 21 | 2 | "Paintings Thief" (20), "Yet Another Waveshooter" (21) |
 | `metacritic_score` | 97 | 3 | GTA V Legacy (96), Baldur's Gate 3 (96), Disco Elysium - The Final Cut (97) — os mais bem avaliados pela crítica |
-| `positive`/`negative`/`peak_ccu` | milhões | 95 cada | Mercado da Steam é extremamente concentrado (ex.: Counter-Strike 2) |
+| `positive`/`negative`/`peak_ccu` | milhões | 94 cada | Mercado da Steam é extremamente concentrado (ex.: Counter-Strike 2) |
 
 Todos os outliers acima são **valores reais, não erro de coleta** — mantidos no conjunto de dados, com a ressalva documentada de que distorcem médias simples nas colunas afetadas.
 
@@ -219,7 +219,7 @@ O arquivo combina duas fontes de contagem de review — Steam API (`positive`/`n
 | Nenhuma das duas tem dado | 11.052 | 11,6% |
 | As duas têm dado | 44.125 | 46,5% |
 
-**Tratamento:** `acceptance_ratio`/`review_count` calculados com fallback entre as duas fontes, cobrindo 88,4% dos jogos.
+**Tratamento:** `acceptance_ratio`/`review_count` calculados com fallback entre as duas fontes, cobrindo 88,4% dos registros da Bronze.
 
 ### Outras transformações
 
@@ -261,7 +261,7 @@ Jogos multiplataforma têm aceitação média maior (79,7% vs. 74,3%) e mais que
 
 ![Volume médio de reviews por tempo desde o lançamento](notebooks/images/pergunta_5.png)
 
-O volume médio de reviews cresce de forma consistente com a idade do jogo — de 769 (1-3 anos) para 6.646 (10+ anos), quase 9x mais. **A resposta é sim**, o resultado mais esperado da análise: reviews se acumulam ao longo do tempo. Isso também é um alerta — `review_count` sozinho favorece jogos antigos, não necessariamente jogos "melhores".
+A idade de cada jogo é medida até a data de coleta do dataset (2025-03-10), o mesmo momento em que as reviews foram contadas. O volume médio de reviews cresce de forma consistente com a idade — de 677 (menos de 1 ano) para 10.523 (10+ anos), cerca de 15x mais, subindo em todas as faixas intermediárias. **A resposta é sim**, o resultado mais esperado da análise: reviews se acumulam ao longo do tempo. Isso também é um alerta — `review_count` sozinho favorece jogos antigos, não necessariamente jogos "melhores".
 
 ### 6. Jogos com mais DLCs tendem a ter maior popularidade (efeito "franquia")?
 
@@ -273,7 +273,7 @@ A relação mais forte de toda a análise: jogos sem DLC têm em média 50.178 o
 
 ![Owners estimados: com vs. sem restrição de idade](notebooks/images/pergunta_7.png)
 
-Apenas 1.056 jogos (1,2%) declaram `required_age > 0` — a ressalva de amostra pequena da Etapa 1 se confirma. Dentro dessa amostra, a aceitação média é ligeiramente menor (73,9% vs. 75,6%), mas o `estimated_owners` médio é quase 17,5 vezes maior (1.486.851 vs. 84.733). Os gêneros mais comuns nesse grupo são Action, Adventure, Indie e RPG. A leitura mais provável não é "restrição de idade causa popularidade": a amostra pequena é dominada por títulos AAA de grande orçamento (esse campo é raramente preenchido pela maioria dos jogos indie/pequenos), inflando a média por viés de composição da amostra.
+Apenas 1.056 jogos (1,2%) declaram `required_age > 0` — a ressalva de amostra pequena da Etapa 1 se confirma. Dentro dessa amostra, a aceitação média é ligeiramente menor (73,9% vs. 75,6%), mas o `estimated_owners` médio é quase 17,5 vezes maior (1.486.851 vs. 84.733). Os gêneros mais comuns nesse grupo são Action, Adventure, Indie e RPG. A leitura mais provável não é "restrição de idade causa popularidade": com uma amostra tão pequena, a média é muito sensível a poucos títulos de grande sucesso (a popularidade na Steam é extremamente concentrada), e bastam alguns jogos de grande porte com classificação indicativa declarada para multiplicar a média do grupo — uma associação influenciada pela composição da amostra, não um efeito da faixa etária em si.
 
 ### 8. (stretch) Nota da crítica está alinhada com a avaliação dos usuários?
 
@@ -305,6 +305,6 @@ As maiores dificuldades não foram na parte de operar o Databricks, mas nas etap
 ### Trabalhos futuros
 
 - **Consolidar jogos com múltiplas listagens (`appid`).** A checagem de qualidade encontrou 28 grupos de jogos com a mesma ficha de loja sob `appid`s diferentes (variantes de edição/pacote/SKU, como o caso de "Shadow of the Tomb Raider" com 20 `appid`s). Um trabalho futuro poderia agrupar essas variantes num "jogo canônico" antes da análise, removendo o peso desproporcional que franquias com muitas SKUs recebem em agregações por gênero, preço ou DLC.
-- **Retomar a fonte descartada como enriquecimento, não como fonte concorrente.** `recommendations.csv`/`users.csv` (41 milhões de reviews individuais) foram deixados de fora por volume, mas poderiam alimentar uma análise de série temporal de avaliações, ou um sistema de recomendação, como extensão do projeto.
+- **Retomar a fonte descartada como enriquecimento, não como fonte concorrente.** `recommendations.csv`/`users.csv` — arquivos que acompanham a fonte descartada (dataset de Anton Kozyriev, CC0), com 41 milhões de reviews individuais — foram deixados de fora por volume, mas poderiam alimentar uma análise de série temporal de avaliações, ou um sistema de recomendação, como extensão do projeto.
 - **Ampliar a cobertura de `metacritic_score`** (hoje só 4% dos jogos) cruzando com outra fonte de notas de crítica, para fortalecer a pergunta 8 além dos dados que a Steam já expõe.
 - **Ir além de correlação simples**: um modelo de regressão ou de classificação para prever `acceptance_ratio`/`estimated_owners` a partir dos atributos do jogo permitiria quantificar o efeito de cada fator controlando pelos demais (isolar, por exemplo, se o efeito do suporte multiplataforma se sustenta depois de controlar por orçamento/gênero), algo que as comparações par a par feitas aqui não conseguem fazer.
