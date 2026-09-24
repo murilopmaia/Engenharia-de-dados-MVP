@@ -1,0 +1,6 @@
+# Dados brutos - não precisam ser versionados (ver README, secao "Contexto dos dados brutos")
+dataset/
+
+# Notas de colaboracao com o assistente de IA - fora do escopo da entrega
+.claude/
+CLAUDE.md
