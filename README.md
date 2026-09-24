@@ -50,13 +50,15 @@ A fonte de dados é o **[Steam Games Dataset 2025](https://www.kaggle.com/datase
 
 ## Carga dos Dados (Etapa 4.2)
 
-O arquivo `games_march2025_full.csv` (~471 MB) foi baixado do Kaggle e enviado manualmente, pela interface do Databricks, para um **Volume do Unity Catalog** (`bronze.steam_games.raw_files`) — o mecanismo do Databricks para armazenar arquivos genéricos (CSV, JSON etc.) antes de virarem tabelas.
+O arquivo `games_march2025_full.csv` (~450 MB) foi baixado do Kaggle e enviado manualmente, pela interface do Databricks, para um **Volume do Unity Catalog** (`bronze.steam_games.raw_files`) — o mecanismo do Databricks para armazenar arquivos genéricos (CSV, JSON etc.) antes de virarem tabelas.
 
 O notebook [`01_bronze_ingestao.ipynb`](notebooks/01_bronze_ingestao.ipynb) lê esse CSV do Volume com Spark (`multiLine`/`escape` habilitados, por conta de campos de texto longos com aspas e quebras de linha internas) e grava como tabela Delta `bronze.steam_games.games_full_raw`, com todas as colunas como `string` (a tipagem é responsabilidade da camada Silver) e duas colunas de controle: `_ingestion_timestamp` e `_source_file`.
 
 Contagem de linhas validada: **94.948** (igual ao arquivo original — nenhuma linha perdida ou corrompida na leitura).
 
-![alt text](notebooks/images/carga_dados.png)
+![Volume do Unity Catalog com o CSV enviado](notebooks/images/carga_dados.png)
+
+*Volume `bronze.steam_games.raw_files` no Catalog Explorer, com o arquivo `games_march2025_full.csv` enviado.*
 
 ---
 
@@ -70,7 +72,9 @@ A organização segue a Arquitetura Medalhão diretamente na estrutura do Unity 
 - `silver.steam_games.games` — dado limpo, tipado e enriquecido (89.729 linhas).
 - `gold.steam_games.*` — Esquema Estrela pronto para responder as perguntas de negócio.
 
-![alt text](notebooks/images/catalogo.jpg)
+![Catálogos bronze, silver e gold no Unity Catalog](notebooks/images/catalogo.jpg)
+
+*Catalog Explorer: um catálogo por camada, cada um com o schema `steam_games` e suas tabelas.*
 
 ### Modelo Gold: Esquema Estrela
 
@@ -169,7 +173,9 @@ O pipeline é **ramificado**: um notebook por camada/etapa, cada um lendo a tabe
 
 Todas as transformações estão documentadas, com o porquê de cada decisão, nas células markdown do notebook [`02_silver_limpeza.ipynb`](notebooks/02_silver_limpeza.ipynb).
 
-![alt text](notebooks/images/catalogo.jpg)
+![Tabelas Delta persistidas nas três camadas](notebooks/images/catalogo.jpg)
+
+*Evidência de persistência: as tabelas Delta gravadas pelos notebooks 01 a 03 nos catálogos `bronze`, `silver` e `gold`.*
 
 ---
 
@@ -267,25 +273,25 @@ A idade de cada jogo é medida até a data de coleta do dataset (2025-03-10), o 
 
 ![Owners estimados por faixa de quantidade de DLCs](notebooks/images/pergunta_6.png)
 
-A relação mais forte de toda a análise: jogos sem DLC têm em média 50.178 owners estimados; jogos com mais de 20 DLCs têm 2.286.542 — quase **45 vezes mais**. **A resposta é claramente sim**, confirmando o "efeito franquia": editoras continuam investindo em DLC para jogos que já venderam bem, e mais DLC mantém o jogo relevante por mais tempo.
+A relação mais forte de toda a análise: jogos sem DLC têm em média 50.178 owners estimados; jogos com mais de 20 DLCs têm 2.286.542 — cerca de **45 vezes mais**. **A resposta é claramente sim**, confirmando o "efeito franquia": editoras continuam investindo em DLC para jogos que já venderam bem, e mais DLC mantém o jogo relevante por mais tempo.
 
 ### 7. Faixa etária exigida se relaciona com gênero, avaliação ou popularidade?
 
 ![Owners estimados: com vs. sem restrição de idade](notebooks/images/pergunta_7.png)
 
-Apenas 1.056 jogos (1,2%) declaram `required_age > 0` — a ressalva de amostra pequena da Etapa 1 se confirma. Dentro dessa amostra, a aceitação média é ligeiramente menor (73,9% vs. 75,6%), mas o `estimated_owners` médio é quase 17,5 vezes maior (1.486.851 vs. 84.733). Os gêneros mais comuns nesse grupo são Action, Adventure, Indie e RPG. A leitura mais provável não é "restrição de idade causa popularidade": com uma amostra tão pequena, a média é muito sensível a poucos títulos de grande sucesso (a popularidade na Steam é extremamente concentrada), e bastam alguns jogos de grande porte com classificação indicativa declarada para multiplicar a média do grupo — uma associação influenciada pela composição da amostra, não um efeito da faixa etária em si.
+Apenas 1.056 jogos (1,2%) declaram `required_age > 0` — a ressalva de amostra pequena da Etapa 1 se confirma. Dentro dessa amostra, a aceitação média é ligeiramente menor (73,9% vs. 75,6%), mas o `estimated_owners` médio é cerca de 17,5 vezes maior (1.486.851 vs. 84.733). Os gêneros mais comuns nesse grupo são Action, Adventure, Indie e RPG. A leitura mais provável não é "restrição de idade causa popularidade": com uma amostra tão pequena, a média é muito sensível a poucos títulos de grande sucesso (a popularidade na Steam é extremamente concentrada), e bastam alguns jogos de grande porte com classificação indicativa declarada para multiplicar a média do grupo — uma associação influenciada pela composição da amostra, não um efeito da faixa etária em si.
 
 ### 8. (stretch) Nota da crítica está alinhada com a avaliação dos usuários?
 
 ![Aceitação média por faixa de nota do Metacritic](notebooks/images/pergunta_8.png)
 
-Só 3.574 jogos (4,0%) têm `metacritic_score`. Dentro desse subconjunto, a correlação com `acceptance_ratio` é **0,60** (moderada a forte), com tendência monotônica: de 54,7% de aceitação média (nota ≤50) a 91,0% (nota 91-100). **A resposta é sim, quando a nota existe**: crítica especializada e avaliação dos jogadores tendem a apontar na mesma direção, mas com dispersão suficiente para não serem intercambiáveis.
+Só 3.574 jogos (4,0%) têm `metacritic_score` e `acceptance_ratio` disponíveis ao mesmo tempo. Dentro desse subconjunto, a correlação com `acceptance_ratio` é **0,60** (moderada a forte), com tendência monotônica: de 54,7% de aceitação média (nota ≤50) a 91,0% (nota 91-100). **A resposta é sim, quando a nota existe**: crítica especializada e avaliação dos jogadores tendem a apontar na mesma direção, mas com dispersão suficiente para não serem intercambiáveis.
 
 ### Discussão geral
 
 Voltando ao problema original — quais fatores mais se relacionam com aceitação e popularidade de um jogo na Steam:
 
-- **Fatores associados à popularidade:** a quantidade de DLCs é o fator mais forte encontrado (quase 45x de diferença), seguido pelo suporte multiplataforma (2x) e, mais fracamente, desconto ativo (+23%). A faixa etária mostrou diferença grande (17,5x), mas provavelmente reflete viés de amostra, não efeito real.
+- **Fatores associados à popularidade:** a quantidade de DLCs é o fator mais forte encontrado (cerca de 45x de diferença), seguido pelo suporte multiplataforma (2x) e, mais fracamente, desconto ativo (+23%). A faixa etária mostrou diferença grande (17,5x), mas provavelmente reflete viés de amostra, não efeito real.
 - **Fatores associados à aceitação:** a nota da crítica especializada é o sinal mais forte (correlação 0,60), mas só existe para 4% dos jogos. Gênero tem efeito modesto, com Massively Multiplayer performando consistentemente pior. **Preço não mostrou relação nenhuma com aceitação** — um achado que contraria a intuição de que jogos mais caros seriam mais bem avaliados.
 - Volume de reviews cresce com o tempo, como esperado — o que reforça que comparações de popularidade entre jogos de idades muito diferentes precisam normalizar por tempo de mercado.
 
